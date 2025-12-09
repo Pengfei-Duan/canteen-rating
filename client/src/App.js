@@ -34,18 +34,44 @@ const getTodayInfo = () => {
 const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五'];
 const MEAL_TYPES = ['早餐', '午餐'];
 
-const DishInput = React.memo(({ value, onChange, onRemove }) => {
+const DishInput = React.memo(({ value, onChange, onRemove, id }) => {
   const [localValue, setLocalValue] = useState(value);
   const inputRef = useRef(null);
+  const isTyping = useRef(false);
+  
   useEffect(() => {
-    if (document.activeElement !== inputRef.current) setLocalValue(value);
+    // 只有在非输入状态时才从props更新
+    if (!isTyping.current) {
+      setLocalValue(value);
+    }
   }, [value]);
+  
+  const handleChange = (e) => {
+    isTyping.current = true;
+    setLocalValue(e.target.value);
+  };
+  
+  const handleBlur = () => {
+    isTyping.current = false;
+    if (localValue !== value) {
+      onChange(localValue);
+    }
+  };
+  
   return (
     <div className="dish-input-row">
-      <input ref={inputRef} type="text" value={localValue}
-        onChange={e => setLocalValue(e.target.value)}
-        onBlur={() => localValue !== value && onChange(localValue)}
-        placeholder="菜品名称" />
+      <input 
+        ref={inputRef} 
+        type="text" 
+        value={localValue}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck="false"
+        placeholder="菜品名称" 
+      />
       <button type="button" onClick={onRemove} className="remove-btn">×</button>
     </div>
   );
@@ -465,8 +491,15 @@ export default function App() {
           </div>
         ) : (
           <>
-            <input type="password" placeholder="请输入数字口令" value={mysteryCode}
-              onChange={e => setMysteryCode(e.target.value)} onKeyPress={e => e.key === 'Enter' && verifyMystery()} />
+            <input 
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="请输入数字口令" 
+              value={mysteryCode}
+              onChange={e => setMysteryCode(e.target.value)} 
+              onKeyDown={e => e.key === 'Enter' && verifyMystery()} 
+            />
             <button className="verify-btn" onClick={verifyMystery}>验证口令</button>
           </>
         )}
@@ -481,8 +514,14 @@ export default function App() {
           <div className="login-card">
             <div className="login-icon">🔐</div>
             <h2>后台管理</h2>
-            <input type="password" placeholder="请输入管理密码" value={adminPwd}
-              onChange={e => setAdminPwd(e.target.value)} onKeyPress={e => e.key === 'Enter' && adminLogin()} />
+            <input 
+              type="text"
+              autoComplete="off"
+              placeholder="请输入管理密码" 
+              value={adminPwd}
+              onChange={e => setAdminPwd(e.target.value)} 
+              onKeyDown={e => e.key === 'Enter' && adminLogin()} 
+            />
             <button onClick={adminLogin}>登录</button>
           </div>
         </div>
