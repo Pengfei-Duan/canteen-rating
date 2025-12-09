@@ -178,19 +178,6 @@ app.post('/api/ratings/submit', (req, res) => {
     
     const ratingsData = readData(RATINGS_FILE);
     
-    // 检查今天是否已评分（基于访客ID、日期和菜品）
-    const existingRating = ratingsData.ratings.find(
-        r => r.visitorId === visitorId && 
-             r.day === day && 
-             r.mealType === mealType && 
-             r.dishName === dishName &&
-             r.dateKey === dateKey
-    );
-    
-    if (existingRating) {
-        return res.status(400).json({ error: '您今天已对该菜品评过分了' });
-    }
-    
     ratingsData.ratings.push({
         id: Date.now().toString(),
         day,
@@ -294,6 +281,74 @@ app.post('/api/menu/clear', (req, res) => {
         res.json({ success: true, message: '菜单数据已清除' });
     } else {
         res.status(500).json({ error: '清除失败' });
+    }
+});
+
+// 导出评分数据为Excel（需要管理员验证）
+app.post('/api/ratings/export', async (req, res) => {
+    const { password } = req.body;
+    const config = readData(CONFIG_FILE);
+    
+    if (password !== config.adminPassword) {
+        return res.status(401).json({ error: '管理员密码错误' });
+    }
+    
+    const ratingsData = readData(RATINGS_FILE);
+    
+    if (!ratingsData || ratingsData.ratings.length === 0) {
+        return res.status(400).json({ error: '暂无评分数据' });
+    }
+    
+    try {
+        const ExcelJS = require('exceljs');
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('评分数据');
+        
+        // 设置表头
+        worksheet.columns = [
+            { header: '日期', key: 'dateKey', width: 15 },
+            { header: '星期', key: 'day', width: 10 },
+            { header: '餐次', key: 'mealType', width: 10 },
+            { header: '菜品', key: 'dishName', width: 20 },
+            { header: '评分', key: 'score', width: 8 },
+            { header: '评论', key: 'comment', width: 40 },
+            { header: '神秘人', key: 'isMystery', width: 10 },
+            { header: '提交时间', key: 'timestamp', width: 20 }
+        ];
+        
+        // 设置表头样式
+        worksheet.getRow(1).font = { bold: true };
+        worksheet.getRow(1).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FF4052B5' }
+        };
+        worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        
+        // 添加数据
+        ratingsData.ratings.forEach(rating => {
+            worksheet.addRow({
+                dateKey: rating.dateKey || '',
+                day: rating.day,
+                mealType: rating.mealType,
+                dishName: rating.dishName,
+                score: rating.score,
+                comment: rating.comment || '',
+                isMystery: rating.isMystery ? '是' : '否',
+                timestamp: rating.timestamp ? new Date(rating.timestamp).toLocaleString('zh-CN') : ''
+            });
+        });
+        
+        // 设置响应头
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=ratings.xlsx');
+        
+        // 写入响应
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        console.error('导出Excel失败:', error);
+        res.status(500).json({ error: '导出失败' });
     }
 });
 
